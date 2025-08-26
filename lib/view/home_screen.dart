@@ -1,4 +1,4 @@
-// Complete Enhanced Home Screen
+// Updated Home Screen with Better Responsiveness and Enhanced Add Subject Button
 import 'dart:convert';
 import 'package:attendance_tracker/view/subject_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:attendance_tracker/http/models/subject.dart';
 import 'package:attendance_tracker/http/models/user.dart';
 import 'package:attendance_tracker/widgets/add_subject_dialog.dart';
 import 'package:attendance_tracker/widgets/edit_subject_dialog.dart';
+import 'package:attendance_tracker/widgets/attendance_marking_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -66,6 +67,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       Future.delayed(Duration(milliseconds: 500), () {
         _fabAnimationController.forward();
       });
+    } else {
+      // No stored user data — stop loading so UI can handle empty state.
+      // If you prefer to create a default UserData instance here, you can do that.
+      setState(() {
+        isLoading = false;
+      });
+      _fabAnimationController.forward();
     }
   }
 
@@ -77,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   _addSubject() {
-    if (userData!.subjects.length >= 10) {
+    if (userData != null && userData!.subjects.length >= 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Maximum 10 subjects allowed'),
@@ -118,169 +126,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // Enhanced increment attendance with date tracking
-  _incrementAttendance(int index) {
-    Subject subject = userData!.subjects[index];
-    DateTime today = DateTime.now();
-
-    // Check if already marked today
-    bool alreadyMarkedToday = subject.attendanceHistory.any((record) =>
-        record.date.year == today.year &&
-        record.date.month == today.month &&
-        record.date.day == today.day);
-
-    if (alreadyMarkedToday) {
-      _showAlreadyMarkedDialog(subject.name);
-      return;
-    }
-
-    if (subject.attendedLectures < subject.totalLectures) {
-      // Haptic feedback
-      HapticFeedback.lightImpact();
-
-      setState(() {
-        subject.markAttendance();
-      });
-      _saveUserData();
-
-      // Show success feedback with date and percentage
-      _showSuccessSnackBar(subject);
-    } else {
-      // Play completion feedback when all lectures attended
-      HapticFeedback.mediumImpact();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.celebration, color: Colors.white, size: 20),
-              SizedBox(width: ResponsiveHelper.getWidth(context) * 0.02),
-              Text('Perfect attendance! 🏆'),
-            ],
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          duration: Duration(milliseconds: 2000),
-        ),
-      );
-    }
-  }
-
-  void _showAlreadyMarkedDialog(String subjectName) {
-    double sw = ResponsiveHelper.getWidth(context);
-    bool isTablet = ResponsiveHelper.isTablet(context);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(isTablet ? 20 : 15),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.info_outline,
-                color: Colors.orange,
-                size: isTablet ? 24 : 20,
-              ),
-            ),
-            SizedBox(width: sw * 0.03),
-            Expanded(
-              child: Text(
-                'Already Marked',
-                style: AppTextStyles.bold(
-                    context, isTablet ? 20 : 18, AppColors.textPrimary),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'You have already marked attendance for $subjectName today (${DateFormat('MMM dd, yyyy').format(DateTime.now())}).',
-          style: AppTextStyles.regular(
-              context, isTablet ? 16 : 14, AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'OK',
-              style: AppTextStyles.medium(
-                  context, isTablet ? 16 : 14, AppColors.primary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSuccessSnackBar(Subject subject) {
-    double sw = ResponsiveHelper.getWidth(context);
-    double sh = ResponsiveHelper.getHeight(context);
-    bool isTablet = ResponsiveHelper.isTablet(context);
-
-    double percentage = subject.percentage;
-    bool milestoneReached = (percentage >= 75 &&
-            percentage - (100 / subject.totalLectures) < 75) ||
-        (percentage >= 50 && percentage - (100 / subject.totalLectures) < 50);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              milestoneReached ? Icons.star : Icons.check_circle,
-              color: Colors.white,
-              size: isTablet ? 24 : 20,
-            ),
-            SizedBox(width: sw * 0.02),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    milestoneReached
-                        ? 'Milestone Reached! 🎉'
-                        : 'Attendance Marked! ✅',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isTablet ? 16 : 14,
-                    ),
-                  ),
-                  Text(
-                    '${DateFormat('MMM dd').format(DateTime.now())} • ${percentage.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontSize: isTablet ? 14 : 12,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        backgroundColor:
-            milestoneReached ? AppColors.warning : AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(isTablet ? 15 : 12),
-        ),
-        margin: EdgeInsets.symmetric(
-          horizontal: sw * 0.04,
-          vertical: sh * 0.02,
-        ),
-        duration: Duration(milliseconds: milestoneReached ? 3000 : 2000),
-      ),
-    );
+  // Handle attendance marking from the new widget
+  void _onAttendanceMarked(Subject updatedSubject, int index) {
+    setState(() {
+      userData!.subjects[index] = updatedSubject;
+    });
+    _saveUserData();
   }
 
   // Navigate to detail screen
@@ -323,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 'Loading your data...',
                 style: AppTextStyles.medium(
                   context,
-                  isTablet ? 18 : 16,
+                  isTablet ? sw * 0.045 : sw * 0.04,
                   AppColors.textSecondary,
                 ),
               ),
@@ -336,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context, sw, sh, isTablet),
-      body: userData!.subjects.isEmpty
+      body: (userData == null || userData!.subjects.isEmpty)
           ? _buildEmptyState(context, sw, sh, isTablet)
           : _buildSubjectsList(context, sw, sh, isTablet),
       floatingActionButton: ScaleTransition(
@@ -379,19 +230,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Hello, ${userData!.nickname}! 👋',
+              'Hello, ${userData?.nickname ?? 'Student'}! 👋',
               style: AppTextStyles.medium(
                 context,
-                isTablet ? 22 : 18,
+                isTablet ? sw * 0.055 : sw * 0.045,
                 Colors.white,
               ),
             ),
             SizedBox(height: sh * 0.005),
             Text(
-              userData!.collegeName,
+              userData?.collegeName ?? '',
               style: AppTextStyles.regular(
                 context,
-                isTablet ? 14 : 12,
+                isTablet ? sw * 0.035 : sw * 0.03,
                 Colors.white70,
               ),
               maxLines: 1,
@@ -408,7 +259,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
+            borderRadius:
+                BorderRadius.circular(isTablet ? sw * 0.03 : sw * 0.025),
           ),
           child: IconButton(
             icon: Icon(
@@ -430,88 +282,106 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Center(
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: sw * 0.05,
-          vertical: sh * 0.02,
+          horizontal: sw * 0.08,
+          vertical: sh * 0.05,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Illustration/Icon Container
             Container(
-              width: isTablet ? sw * 0.2 : sw * 0.35,
-              height: isTablet ? sw * 0.2 : sw * 0.35,
+              width: isTablet ? sw * 0.3 : sw * 0.4,
+              height: isTablet ? sw * 0.3 : sw * 0.4,
               decoration: BoxDecoration(
-                color: AppColors.secondary.withOpacity(0.1),
-                borderRadius:
-                    BorderRadius.circular(isTablet ? sw * 0.05 : sw * 0.08),
-                border: Border.all(
-                  color: AppColors.secondary.withOpacity(0.3),
-                  width: 2,
-                ),
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.1),
+                    blurRadius: isTablet ? 30 : 20,
+                    offset: Offset(0, isTablet ? 10 : 8),
+                  ),
+                ],
               ),
               child: Icon(
-                Icons.book,
-                size: isTablet ? sw * 0.1 : sw * 0.18,
-                color: AppColors.secondary,
+                Icons.school,
+                size: isTablet ? sw * 0.15 : sw * 0.2,
+                color: AppColors.primary,
               ),
             ),
-            SizedBox(height: sh * 0.04),
+
+            SizedBox(height: sh * 0.05),
+
+            // Title
             Text(
-              'No Subjects Added Yet',
+              'Start Your Journey',
               style: AppTextStyles.bold(
                 context,
-                isTablet ? 28 : 24,
+                isTablet ? sw * 0.07 : sw * 0.06,
                 AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
+
             SizedBox(height: sh * 0.015),
-            Container(
-              width: isTablet ? sw * 0.7 : sw * 0.9,
-              child: Text(
-                'Add your subjects to start tracking attendance and never miss your target percentage!',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.regular(
-                  context,
-                  isTablet ? 18 : 16,
-                  AppColors.textSecondary,
-                ),
+
+            // Subtitle
+            Text(
+              'Add your first subject to begin tracking your attendance and academic progress.',
+              style: AppTextStyles.regular(
+                context,
+                isTablet ? sw * 0.04 : sw * 0.035,
+                AppColors.textSecondary,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 3,
             ),
-            SizedBox(height: sh * 0.05),
+
+            SizedBox(height: sh * 0.06),
+
+            // Enhanced Add Subject Button
             Container(
-              width: isTablet ? sw * 0.4 : sw * 0.7,
+              width: isTablet ? sw * 0.5 : sw * 0.7,
               height: isTablet ? sh * 0.08 : sh * 0.07,
-              constraints: BoxConstraints(
-                minHeight: isTablet ? 65 : 55,
-                maxHeight: isTablet ? 75 : 65,
-              ),
-              child: ElevatedButton.icon(
+              child: ElevatedButton(
                 onPressed: _addSubject,
-                icon: Icon(
-                  Icons.add,
-                  color: Colors.white,
-                  size: isTablet ? 24 : 20,
-                ),
-                label: Text(
-                  'Add Your First Subject',
-                  style: AppTextStyles.medium(
-                    context,
-                    isTablet ? 18 : 16,
-                    Colors.white,
-                  ),
-                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(isTablet ? 18 : 15),
+                    borderRadius: BorderRadius.circular(
+                        isTablet ? sw * 0.045 : sw * 0.04),
                   ),
                   elevation: isTablet ? 12 : 8,
                   shadowColor: AppColors.primary.withOpacity(0.4),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: sw * 0.06,
-                    vertical: sh * 0.02,
-                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding:
+                          EdgeInsets.all(isTablet ? sw * 0.01 : sw * 0.008),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(
+                            isTablet ? sw * 0.02 : sw * 0.015),
+                      ),
+                      child: Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: isTablet ? sw * 0.05 : sw * 0.045,
+                      ),
+                    ),
+                    SizedBox(width: sw * 0.03),
+                    Text(
+                      'Add Your First Subject',
+                      style: AppTextStyles.medium(
+                        context,
+                        isTablet ? sw * 0.045 : sw * 0.04,
+                        Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -566,12 +436,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         margin: EdgeInsets.only(bottom: sh * 0.02),
         decoration: BoxDecoration(
           color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(isTablet ? 20 : 15),
+          borderRadius: BorderRadius.circular(isTablet ? sw * 0.05 : sw * 0.04),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
-              blurRadius: isTablet ? 20 : 15,
-              offset: Offset(0, isTablet ? 6 : 4),
+              blurRadius: isTablet ? sw * 0.05 : sw * 0.04,
+              offset: Offset(0, isTablet ? sw * 0.015 : sw * 0.01),
               spreadRadius: isTablet ? 1 : 0,
             ),
           ],
@@ -589,38 +459,89 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       subject.name,
                       style: AppTextStyles.bold(
                         context,
-                        isTablet ? 22 : 18,
+                        isTablet ? sw * 0.055 : sw * 0.045,
                         AppColors.textPrimary,
                       ),
                     ),
                     SizedBox(height: sh * 0.008),
 
-                    // Attendance Count
-                    Text(
-                      '${subject.attendedLectures}/${subject.totalLectures} lectures',
-                      style: AppTextStyles.regular(
-                        context,
-                        isTablet ? 16 : 14,
-                        AppColors.textSecondary,
-                      ),
+                    // Attendance Count - RESPONSIVE
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: sw * 0.025,
+                            vertical: sh * 0.005,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(
+                                isTablet ? sw * 0.02 : sw * 0.015),
+                          ),
+                          child: Text(
+                            '${subject.attendedLectures}',
+                            style: AppTextStyles.bold(
+                              context,
+                              isTablet ? sw * 0.04 : sw * 0.035,
+                              AppColors.success,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          ' / ',
+                          style: AppTextStyles.regular(
+                            context,
+                            isTablet ? sw * 0.04 : sw * 0.035,
+                            AppColors.textSecondary,
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: sw * 0.025,
+                            vertical: sh * 0.005,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(
+                                isTablet ? sw * 0.02 : sw * 0.015),
+                          ),
+                          child: Text(
+                            '${subject.totalLectures}',
+                            style: AppTextStyles.bold(
+                              context,
+                              isTablet ? sw * 0.04 : sw * 0.035,
+                              AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: sw * 0.02),
+                        Text(
+                          'lectures',
+                          style: AppTextStyles.regular(
+                            context,
+                            isTablet ? sw * 0.04 : sw * 0.035,
+                            AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
 
-                    // Last Attended Date (NEW)
+                    // Last Activity (RESPONSIVE)
                     if (subject.attendanceHistory.isNotEmpty) ...[
                       SizedBox(height: sh * 0.005),
                       Row(
                         children: [
                           Icon(
                             Icons.schedule,
-                            size: isTablet ? 16 : 14,
+                            size: isTablet ? sw * 0.04 : sw * 0.035,
                             color: AppColors.secondary,
                           ),
                           SizedBox(width: sw * 0.01),
                           Text(
-                            'Last: ${DateFormat('MMM dd, HH:mm').format(subject.attendanceHistory.last.date)}',
+                            'Last: ${DateFormat('MMM dd, HH:mm').format(subject.attendanceHistory.last.markedAt)}',
                             style: AppTextStyles.regular(
                               context,
-                              isTablet ? 14 : 12,
+                              isTablet ? sw * 0.035 : sw * 0.03,
                               AppColors.secondary,
                             ),
                           ),
@@ -632,9 +553,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                     // Progress Bar
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
+                      borderRadius: BorderRadius.circular(
+                          isTablet ? sw * 0.03 : sw * 0.025),
                       child: LinearProgressIndicator(
-                        value: subject.percentage / 100,
+                        value: subject.totalLectures > 0
+                            ? subject.percentage / 100
+                            : 0,
                         minHeight: isTablet ? sh * 0.012 : sh * 0.01,
                         backgroundColor: Colors.grey[200],
                         valueColor: AlwaysStoppedAnimation<Color>(
@@ -653,15 +577,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '${subject.percentage.toStringAsFixed(1)}%',
+                          subject.totalLectures > 0
+                              ? '${subject.percentage.toStringAsFixed(1)}%'
+                              : 'No data',
                           style: AppTextStyles.medium(
                             context,
-                            isTablet ? 18 : 16,
-                            subject.percentage >= 75
-                                ? AppColors.success
-                                : subject.percentage >= 50
-                                    ? AppColors.warning
-                                    : AppColors.accent,
+                            isTablet ? sw * 0.045 : sw * 0.04,
+                            subject.totalLectures > 0
+                                ? (subject.percentage >= 75
+                                    ? AppColors.success
+                                    : subject.percentage >= 50
+                                        ? AppColors.warning
+                                        : AppColors.accent)
+                                : AppColors.textSecondary,
                           ),
                         ),
                         Container(
@@ -670,42 +598,48 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             vertical: isTablet ? sh * 0.008 : sh * 0.006,
                           ),
                           decoration: BoxDecoration(
-                            color: subject.percentage >= 75
-                                ? AppColors.success.withOpacity(0.1)
-                                : subject.percentage >= 50
-                                    ? AppColors.warning.withOpacity(0.1)
-                                    : AppColors.accent.withOpacity(0.1),
-                            borderRadius:
-                                BorderRadius.circular(isTablet ? 15 : 12),
+                            color: subject.totalLectures > 0
+                                ? (subject.percentage >= 75
+                                    ? AppColors.success.withOpacity(0.1)
+                                    : subject.percentage >= 50
+                                        ? AppColors.warning.withOpacity(0.1)
+                                        : AppColors.accent.withOpacity(0.1))
+                                : AppColors.textSecondary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(
+                                isTablet ? sw * 0.0375 : sw * 0.03),
                           ),
                           child: Text(
-                            subject.percentage >= 75
-                                ? 'Excellent'
-                                : subject.percentage >= 50
-                                    ? 'Good'
-                                    : 'Needs Attention',
+                            subject.totalLectures > 0
+                                ? (subject.percentage >= 75
+                                    ? 'Excellent'
+                                    : subject.percentage >= 50
+                                        ? 'Good'
+                                        : 'Needs Attention')
+                                : 'Getting Started',
                             style: AppTextStyles.medium(
                               context,
-                              isTablet ? 14 : 12,
-                              subject.percentage >= 75
-                                  ? AppColors.success
-                                  : subject.percentage >= 50
-                                      ? AppColors.warning
-                                      : AppColors.accent,
+                              isTablet ? sw * 0.035 : sw * 0.03,
+                              subject.totalLectures > 0
+                                  ? (subject.percentage >= 75
+                                      ? AppColors.success
+                                      : subject.percentage >= 50
+                                          ? AppColors.warning
+                                          : AppColors.accent)
+                                  : AppColors.textSecondary,
                             ),
                           ),
                         ),
                       ],
                     ),
 
-                    // Streak Display (NEW)
+                    // Streak Display (if applicable)
                     if (subject.getCurrentStreak() > 1) ...[
                       SizedBox(height: sh * 0.01),
                       Row(
                         children: [
                           Icon(
                             Icons.local_fire_department,
-                            size: isTablet ? 16 : 14,
+                            size: isTablet ? sw * 0.04 : sw * 0.035,
                             color: Colors.orange,
                           ),
                           SizedBox(width: sw * 0.01),
@@ -713,7 +647,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             '${subject.getCurrentStreak()} day streak!',
                             style: AppTextStyles.medium(
                               context,
-                              isTablet ? 14 : 12,
+                              isTablet ? sw * 0.035 : sw * 0.03,
                               Colors.orange,
                             ),
                           ),
@@ -728,48 +662,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               // Attendance Button and Menu
               Column(
                 children: [
-                  GestureDetector(
-                    onTap: () => _incrementAttendance(index),
-                    child: AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
-                      width: isTablet ? sw * 0.12 : sw * 0.15,
-                      height: isTablet ? sw * 0.12 : sw * 0.15,
-                      decoration: BoxDecoration(
-                        color: subject.attendedLectures < subject.totalLectures
-                            ? AppColors.primary
-                            : AppColors.success,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: (subject.attendedLectures <
-                                        subject.totalLectures
-                                    ? AppColors.primary
-                                    : AppColors.success)
-                                .withOpacity(0.3),
-                            blurRadius: isTablet ? 12 : 10,
-                            offset: Offset(0, isTablet ? 6 : 4),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        subject.attendedLectures >= subject.totalLectures
-                            ? Icons.celebration
-                            : Icons.add,
-                        color: Colors.white,
-                        size: isTablet ? sw * 0.06 : sw * 0.08,
-                      ),
-                    ),
+                  // NEW: Use the enhanced attendance marking widget
+                  AttendanceMarkingWidget(
+                    subject: subject,
+                    onAttendanceMarked: (updatedSubject) =>
+                        _onAttendanceMarked(updatedSubject, index),
+                    index: index,
                   ),
+
                   SizedBox(height: sh * 0.015),
 
                   // Menu Button
                   PopupMenuButton<String>(
                     onSelected: (value) => _handleSubjectAction(value, index),
                     icon: Container(
-                      padding: EdgeInsets.all(isTablet ? 8 : 6),
+                      padding:
+                          EdgeInsets.all(isTablet ? sw * 0.02 : sw * 0.015),
                       decoration: BoxDecoration(
                         color: AppColors.textSecondary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(isTablet ? 8 : 6),
+                        borderRadius: BorderRadius.circular(
+                            isTablet ? sw * 0.02 : sw * 0.015),
                       ),
                       child: Icon(
                         Icons.more_vert,
@@ -783,8 +695,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Icon(Icons.info_outline,
-                                color: AppColors.primary, size: 20),
-                            SizedBox(width: 10),
+                                color: AppColors.primary, size: sw * 0.05),
+                            SizedBox(width: sw * 0.025),
                             Text('View Details'),
                           ],
                         ),
@@ -794,8 +706,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Icon(Icons.edit,
-                                color: AppColors.warning, size: 20),
-                            SizedBox(width: 10),
+                                color: AppColors.warning, size: sw * 0.05),
+                            SizedBox(width: sw * 0.025),
                             Text('Edit Subject'),
                           ],
                         ),
@@ -805,8 +717,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Icon(Icons.refresh,
-                                color: AppColors.warning, size: 20),
-                            SizedBox(width: 10),
+                                color: AppColors.warning, size: sw * 0.05),
+                            SizedBox(width: sw * 0.025),
                             Text('Reset Attendance'),
                           ],
                         ),
@@ -816,8 +728,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Row(
                           children: [
                             Icon(Icons.delete,
-                                color: AppColors.accent, size: 20),
-                            SizedBox(width: 10),
+                                color: AppColors.accent, size: sw * 0.05),
+                            SizedBox(width: sw * 0.025),
                             Text('Delete Subject'),
                           ],
                         ),
@@ -880,7 +792,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _resetAttendance(int index) {
     double sw = ResponsiveHelper.getWidth(context);
-    double sh = ResponsiveHelper.getHeight(context);
     bool isTablet = ResponsiveHelper.isTablet(context);
 
     showDialog(
@@ -888,19 +799,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(isTablet ? sw * 0.04 : sw * 0.05),
-        ),
-        contentPadding: EdgeInsets.all(isTablet ? sw * 0.04 : sw * 0.05),
-        titlePadding: EdgeInsets.fromLTRB(
-          isTablet ? sw * 0.04 : sw * 0.05,
-          isTablet ? sh * 0.025 : sh * 0.02,
-          isTablet ? sw * 0.04 : sw * 0.05,
-          sh * 0.01,
-        ),
-        actionsPadding: EdgeInsets.fromLTRB(
-          isTablet ? sw * 0.04 : sw * 0.05,
-          0,
-          isTablet ? sw * 0.04 : sw * 0.05,
-          isTablet ? sh * 0.02 : sh * 0.015,
         ),
         title: Row(
           children: [
@@ -924,197 +822,77 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 'Reset Attendance',
                 style: AppTextStyles.bold(
                   context,
-                  isTablet ? 22 : 20,
+                  isTablet ? sw * 0.055 : sw * 0.05,
                   AppColors.textPrimary,
                 ),
               ),
             ),
           ],
         ),
-        content: Container(
-          width: isTablet ? sw * 0.6 : sw * 0.8,
-          constraints: BoxConstraints(
-            maxHeight: sh * 0.3,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Are you sure you want to reset attendance for',
-                style: AppTextStyles.regular(
-                  context,
-                  isTablet ? 18 : 16,
-                  AppColors.textSecondary,
-                ),
-              ),
-              SizedBox(height: sh * 0.01),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: sw * 0.03,
-                  vertical: sh * 0.01,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.1),
-                  borderRadius:
-                      BorderRadius.circular(isTablet ? sw * 0.02 : sw * 0.025),
-                ),
-                child: Text(
-                  userData!.subjects[index].name,
-                  style: AppTextStyles.bold(
-                    context,
-                    isTablet ? 18 : 16,
-                    AppColors.warning,
-                  ),
-                ),
-              ),
-              SizedBox(height: sh * 0.015),
-              Container(
-                padding: EdgeInsets.all(isTablet ? sw * 0.025 : sw * 0.03),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.05),
-                  borderRadius:
-                      BorderRadius.circular(isTablet ? sw * 0.02 : sw * 0.025),
-                  border: Border.all(
-                    color: AppColors.warning.withOpacity(0.2),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: AppColors.warning,
-                      size: isTablet ? 20 : 18,
-                    ),
-                    SizedBox(width: sw * 0.02),
-                    Expanded(
-                      child: Text(
-                        'This will clear all ${userData!.subjects[index].attendanceHistory.length} attendance records.',
-                        style: AppTextStyles.medium(
-                          context,
-                          isTablet ? 14 : 12,
-                          AppColors.warning,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        content: Text(
+          'This will reset all attendance data for ${userData!.subjects[index].name}. This action cannot be undone.',
+          style: AppTextStyles.regular(
+            context,
+            isTablet ? sw * 0.04 : sw * 0.035,
+            AppColors.textSecondary,
           ),
         ),
         actions: [
-          Container(
-            width: double.infinity,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: isTablet ? sh * 0.065 : sh * 0.06,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                              isTablet ? sw * 0.025 : sw * 0.03),
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: sw * 0.04,
-                          vertical: sh * 0.015,
-                        ),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: AppTextStyles.medium(
-                          context,
-                          isTablet ? 18 : 16,
-                          AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.medium(
+                context,
+                isTablet ? sw * 0.04 : sw * 0.035,
+                AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                userData!.subjects[index] = Subject(
+                  name: userData!.subjects[index].name,
+                  description: userData!.subjects[index].description,
+                  targetPercentage: userData!.subjects[index].targetPercentage,
+                  createdDate: userData!.subjects[index].createdDate,
+                );
+              });
+              _saveUserData();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle,
+                          color: Colors.white, size: sw * 0.05),
+                      SizedBox(width: sw * 0.02),
+                      Text('Attendance reset successfully'),
+                    ],
+                  ),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(sw * 0.03),
                   ),
                 ),
-                SizedBox(width: sw * 0.03),
-                Expanded(
-                  child: Container(
-                    height: isTablet ? sh * 0.065 : sh * 0.06,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          userData!.subjects[index].attendanceHistory.clear();
-                        });
-                        _saveUserData();
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                Icon(Icons.check_circle,
-                                    color: Colors.white, size: 20),
-                                SizedBox(width: sw * 0.02),
-                                Expanded(
-                                  child: Text(
-                                    'Attendance reset successfully',
-                                    style: TextStyle(
-                                      fontSize: isTablet ? 16 : 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            backgroundColor: AppColors.success,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                  isTablet ? sw * 0.025 : sw * 0.03),
-                            ),
-                            margin: EdgeInsets.symmetric(
-                              horizontal: sw * 0.04,
-                              vertical: sh * 0.02,
-                            ),
-                            duration: Duration(milliseconds: 2000),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.warning,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                              isTablet ? sw * 0.025 : sw * 0.03),
-                        ),
-                        elevation: isTablet ? 6 : 4,
-                        shadowColor: AppColors.warning.withOpacity(0.3),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: sw * 0.04,
-                          vertical: sh * 0.015,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.refresh,
-                            size: isTablet ? 20 : 18,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: sw * 0.02),
-                          Text(
-                            'Reset',
-                            style: AppTextStyles.medium(
-                              context,
-                              isTablet ? 18 : 16,
-                              Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(isTablet ? sw * 0.03 : sw * 0.02),
+              ),
+            ),
+            child: Text(
+              'Reset',
+              style: AppTextStyles.medium(
+                context,
+                isTablet ? sw * 0.04 : sw * 0.035,
+                Colors.white,
+              ),
             ),
           ),
         ],
@@ -1124,7 +902,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _deleteSubject(int index) {
     double sw = ResponsiveHelper.getWidth(context);
-    double sh = ResponsiveHelper.getHeight(context);
     bool isTablet = ResponsiveHelper.isTablet(context);
 
     showDialog(
@@ -1155,59 +932,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 'Delete Subject',
                 style: AppTextStyles.bold(
                   context,
-                  isTablet ? 20 : 18,
+                  isTablet ? sw * 0.05 : sw * 0.045,
                   AppColors.textPrimary,
                 ),
               ),
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to permanently delete ${userData!.subjects[index].name}?',
-              style: AppTextStyles.regular(
-                context,
-                isTablet ? 16 : 14,
-                AppColors.textSecondary,
-              ),
-            ),
-            SizedBox(height: sh * 0.015),
-            Container(
-              padding: EdgeInsets.all(isTablet ? sw * 0.025 : sw * 0.03),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.05),
-                borderRadius:
-                    BorderRadius.circular(isTablet ? sw * 0.02 : sw * 0.025),
-                border: Border.all(
-                  color: AppColors.accent.withOpacity(0.2),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppColors.accent,
-                    size: isTablet ? 20 : 18,
-                  ),
-                  SizedBox(width: sw * 0.02),
-                  Expanded(
-                    child: Text(
-                      'This action cannot be undone. All attendance data will be lost.',
-                      style: AppTextStyles.medium(
-                        context,
-                        isTablet ? 14 : 12,
-                        AppColors.accent,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        content: Text(
+          'Are you sure you want to permanently delete ${userData!.subjects[index].name}? This action cannot be undone.',
+          style: AppTextStyles.regular(
+            context,
+            isTablet ? sw * 0.04 : sw * 0.035,
+            AppColors.textSecondary,
+          ),
         ),
         actions: [
           TextButton(
@@ -1216,7 +954,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               'Cancel',
               style: AppTextStyles.medium(
                 context,
-                isTablet ? 16 : 14,
+                isTablet ? sw * 0.04 : sw * 0.035,
                 AppColors.textSecondary,
               ),
             ),
@@ -1232,7 +970,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 SnackBar(
                   content: Row(
                     children: [
-                      Icon(Icons.delete_forever, color: Colors.white, size: 20),
+                      Icon(Icons.delete_forever,
+                          color: Colors.white, size: sw * 0.05),
                       SizedBox(width: sw * 0.02),
                       Text('Subject deleted successfully'),
                     ],
@@ -1240,7 +979,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   backgroundColor: AppColors.accent,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(sw * 0.03),
                   ),
                 ),
               );
@@ -1248,14 +987,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(isTablet ? 12 : 8),
+                borderRadius:
+                    BorderRadius.circular(isTablet ? sw * 0.03 : sw * 0.02),
               ),
             ),
             child: Text(
               'Delete',
               style: AppTextStyles.medium(
                 context,
-                isTablet ? 16 : 14,
+                isTablet ? sw * 0.04 : sw * 0.035,
                 Colors.white,
               ),
             ),
@@ -1264,57 +1004,4 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
-}
-
-// Subject Detail Screen (Simple version - you can expand this)
-
-Widget _buildStatCard(String title, String value, Color color, IconData icon,
-    double sw, bool isTablet) {
-  return Container(
-    padding: EdgeInsets.all(isTablet ? sw * 0.04 : sw * 0.04),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(isTablet ? 15 : 12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 10,
-          offset: Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(isTablet ? 12 : 10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(isTablet ? 12 : 10),
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: isTablet ? 28 : 24,
-          ),
-        ),
-        SizedBox(height: 12),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isTablet ? 24 : 20,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: isTablet ? 14 : 12,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    ),
-  );
 }
