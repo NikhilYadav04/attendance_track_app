@@ -31,6 +31,147 @@ class _SubjectDetailScreenCompleteState
   }
 
   @override
+  void didUpdateWidget(SubjectDetailScreenComplete oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update the local subject when the widget updates
+    if (oldWidget.subject != widget.subject) {
+      setState(() {
+        subject = widget.subject;
+      });
+    }
+  }
+
+  // Force refresh the subject data from the current widget
+  void _refreshSubjectData() {
+    if (mounted) {
+      setState(() {
+        subject = widget.subject;
+      });
+    }
+  }
+
+  void _deleteAttendanceRecord(AttendanceRecord recordToDelete) {
+    final sw = MediaQuery.of(context).size.width;
+    //final sh = MediaQuery.of(context).size.height;
+    final isTablet = sw >= 600;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(isTablet ? sw * 0.04 : sw * 0.05),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: isTablet ? sw * 0.08 : sw * 0.1,
+              height: isTablet ? sw * 0.08 : sw * 0.1,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.1),
+                borderRadius:
+                    BorderRadius.circular(isTablet ? sw * 0.02 : sw * 0.025),
+              ),
+              child: Icon(
+                Icons.delete_outline,
+                color: AppColors.accent,
+                size: isTablet ? sw * 0.04 : sw * 0.05,
+              ),
+            ),
+            SizedBox(width: sw * 0.03),
+            Expanded(
+              child: Text(
+                'Delete Record',
+                style: TextStyle(
+                  fontSize: isTablet ? sw * 0.05 : sw * 0.045,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete this attendance record from ${DateFormat('MMM dd, yyyy').format(recordToDelete.date)}? This will update your attendance count.',
+          style: TextStyle(
+            fontSize: isTablet ? sw * 0.04 : sw * 0.035,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: isTablet ? sw * 0.04 : sw * 0.035,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _performDeleteRecord(recordToDelete);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(isTablet ? sw * 0.03 : sw * 0.02),
+              ),
+            ),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                fontSize: isTablet ? sw * 0.04 : sw * 0.035,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _performDeleteRecord(AttendanceRecord recordToDelete) {
+    setState(() {
+      // Remove the record from attendance history
+      subject.attendanceHistory.removeWhere((record) =>
+          record.date == recordToDelete.date &&
+          record.markedAt == recordToDelete.markedAt);
+
+      // Update the counts
+      subject.totalLectures = subject.attendanceHistory.length;
+      subject.attendedLectures =
+          subject.attendanceHistory.where((record) => record.isPresent).length;
+    });
+
+    // Update the parent screen
+    widget.onSubjectUpdated(subject);
+
+    // Show success message
+    final sw = MediaQuery.of(context).size.width;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.white, size: sw * 0.05),
+            SizedBox(width: sw * 0.02),
+            Text('Attendance record deleted successfully'),
+          ],
+        ),
+        backgroundColor: AppColors.accent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(sw * 0.03),
+        ),
+      ),
+    );
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
@@ -46,12 +187,9 @@ class _SubjectDetailScreenCompleteState
     return 0;
   }
 
-  double _percentageFromHistory() {
-    final history = subject.attendanceHistory;
-    if (history.isEmpty) return subject.percentage;
-    int present = history.where((r) => r.isPresent).length;
-    int total = history.length;
-    return total == 0 ? 0.0 : (present / total) * 100;
+  double _getCurrentPercentage() {
+    // Use the subject's own percentage calculation to ensure consistency
+    return subject.percentage;
   }
 
   Widget _buildCalendarGrid(double sw, double sh, bool isTablet) {
@@ -107,9 +245,11 @@ class _SubjectDetailScreenCompleteState
         return Container(
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(isTablet ? sw * 0.015 : sw * 0.02),
-            border:
-                isToday ? Border.all(color: AppColors.primary, width: sw * 0.005) : null,
+            borderRadius:
+                BorderRadius.circular(isTablet ? sw * 0.015 : sw * 0.02),
+            border: isToday
+                ? Border.all(color: AppColors.primary, width: sw * 0.005)
+                : null,
           ),
           child: Center(
             child: Column(
@@ -125,10 +265,12 @@ class _SubjectDetailScreenCompleteState
                 ),
                 if (status == 1)
                   Icon(Icons.check,
-                      color: Colors.white, size: isTablet ? sw * 0.015 : sw * 0.025),
+                      color: Colors.white,
+                      size: isTablet ? sw * 0.015 : sw * 0.025),
                 if (status == 2)
                   Icon(Icons.close,
-                      color: Colors.white, size: isTablet ? sw * 0.015 : sw * 0.025),
+                      color: Colors.white,
+                      size: isTablet ? sw * 0.015 : sw * 0.025),
               ],
             ),
           ),
@@ -187,7 +329,8 @@ class _SubjectDetailScreenCompleteState
                 SizedBox(height: sh * 0.005),
                 Row(children: [
                   Icon(Icons.access_time,
-                      size: isTablet ? sw * 0.02 : sw * 0.035, color: AppColors.textSecondary),
+                      size: isTablet ? sw * 0.02 : sw * 0.035,
+                      color: AppColors.textSecondary),
                   SizedBox(width: sw * 0.01),
                   Text('Marked at ${DateFormat('HH:mm').format(r.markedAt)}',
                       style: TextStyle(
@@ -197,16 +340,34 @@ class _SubjectDetailScreenCompleteState
               ],
             ),
           ),
-          Container(
-            padding: EdgeInsets.all(isTablet ? sw * 0.01 : sw * 0.015),
-            decoration: BoxDecoration(
-                color: present
-                    ? AppColors.success.withOpacity(0.1)
-                    : Colors.grey[200],
-                borderRadius: BorderRadius.circular(sw * 0.02)),
-            child: Icon(present ? Icons.check_circle : Icons.cancel,
-                color: present ? AppColors.success : Colors.grey[600],
-                size: isTablet ? sw * 0.03 : sw * 0.05),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(isTablet ? sw * 0.01 : sw * 0.015),
+                decoration: BoxDecoration(
+                    color: present
+                        ? AppColors.success.withOpacity(0.1)
+                        : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(sw * 0.02)),
+                child: Icon(present ? Icons.check_circle : Icons.cancel,
+                    color: present ? AppColors.success : Colors.grey[600],
+                    size: isTablet ? sw * 0.03 : sw * 0.05),
+              ),
+              SizedBox(width: sw * 0.02),
+              GestureDetector(
+                onTap: () => _deleteAttendanceRecord(r),
+                child: Container(
+                  padding: EdgeInsets.all(isTablet ? sw * 0.01 : sw * 0.015),
+                  decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(sw * 0.02)),
+                  child: Icon(Icons.delete_outline,
+                      color: AppColors.accent,
+                      size: isTablet ? sw * 0.03 : sw * 0.05),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -217,14 +378,16 @@ class _SubjectDetailScreenCompleteState
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _legendItem(AppColors.success, 'Present', Icons.check_circle, isTablet, sw),
+        _legendItem(
+            AppColors.success, 'Present', Icons.check_circle, isTablet, sw),
         _legendItem(Colors.grey[350]!, 'Absent', Icons.cancel, isTablet, sw),
         _legendItem(AppColors.primary, 'Today', Icons.today, isTablet, sw),
       ],
     );
   }
 
-  Widget _legendItem(Color color, String label, IconData icon, bool isTablet, double sw) {
+  Widget _legendItem(
+      Color color, String label, IconData icon, bool isTablet, double sw) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -233,11 +396,13 @@ class _SubjectDetailScreenCompleteState
             height: isTablet ? sw * 0.025 : sw * 0.04,
             decoration: BoxDecoration(
                 color: color, borderRadius: BorderRadius.circular(sw * 0.01)),
-            child: Icon(icon, color: Colors.white, size: isTablet ? sw * 0.015 : sw * 0.025)),
+            child: Icon(icon,
+                color: Colors.white, size: isTablet ? sw * 0.015 : sw * 0.025)),
         SizedBox(width: sw * 0.02),
         Text(label,
             style: TextStyle(
-                fontSize: isTablet ? sw * 0.018 : sw * 0.03, color: AppColors.textPrimary)),
+                fontSize: isTablet ? sw * 0.018 : sw * 0.03,
+                color: AppColors.textPrimary)),
       ],
     );
   }
@@ -254,7 +419,7 @@ class _SubjectDetailScreenCompleteState
     final sw = MediaQuery.of(context).size.width;
     final sh = MediaQuery.of(context).size.height;
     final isTablet = sw >= 600;
-    final percentToShow = _percentageFromHistory();
+    final percentToShow = _getCurrentPercentage();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -263,7 +428,8 @@ class _SubjectDetailScreenCompleteState
           margin: EdgeInsets.all(isTablet ? sw * 0.015 : sw * 0.025),
           decoration: BoxDecoration(
               color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(isTablet ? sw * 0.015 : sw * 0.025)),
+              borderRadius:
+                  BorderRadius.circular(isTablet ? sw * 0.015 : sw * 0.025)),
           child: GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Icon(Icons.arrow_back,
@@ -285,13 +451,16 @@ class _SubjectDetailScreenCompleteState
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           labelStyle: TextStyle(
-              fontSize: isTablet ? sw * 0.02 : sw * 0.035, fontWeight: FontWeight.w600),
+              fontSize: isTablet ? sw * 0.02 : sw * 0.035,
+              fontWeight: FontWeight.w600),
           tabs: [
             Tab(
-                icon: Icon(Icons.calendar_today, size: isTablet ? sw * 0.03 : sw * 0.05),
+                icon: Icon(Icons.calendar_today,
+                    size: isTablet ? sw * 0.03 : sw * 0.05),
                 text: 'Calendar'),
             Tab(
-                icon: Icon(Icons.list_alt, size: isTablet ? sw * 0.03 : sw * 0.05),
+                icon: Icon(Icons.list_alt,
+                    size: isTablet ? sw * 0.03 : sw * 0.05),
                 text: 'History'),
           ],
         ),
@@ -308,7 +477,8 @@ class _SubjectDetailScreenCompleteState
                   padding: EdgeInsets.all(sw * 0.04),
                   decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(isTablet ? sw * 0.025 : sw * 0.04)),
+                      borderRadius: BorderRadius.circular(
+                          isTablet ? sw * 0.025 : sw * 0.04)),
                   child: Column(
                     children: [
                       Row(
@@ -330,13 +500,15 @@ class _SubjectDetailScreenCompleteState
                                 Text(
                                     '${subject.attendedLectures} / ${subject.totalLectures} lectures',
                                     style: TextStyle(
-                                        fontSize: isTablet ? sw * 0.018 : sw * 0.03,
+                                        fontSize:
+                                            isTablet ? sw * 0.018 : sw * 0.03,
                                         color: AppColors.textSecondary,
                                         fontWeight: FontWeight.w600)),
                                 SizedBox(height: sh * 0.005),
                                 Text('${percentToShow.toStringAsFixed(1)}%',
                                     style: TextStyle(
-                                        fontSize: isTablet ? sw * 0.022 : sw * 0.04,
+                                        fontSize:
+                                            isTablet ? sw * 0.022 : sw * 0.04,
                                         fontWeight: FontWeight.bold,
                                         color: subject.isGoalAchieved
                                             ? AppColors.success
@@ -350,11 +522,14 @@ class _SubjectDetailScreenCompleteState
                   ),
                 ),
                 SizedBox(height: sh * 0.03),
+                _buildNoteCard(subject, sw, sh, isTablet),
+                SizedBox(height: sh * 0.03),
                 Container(
                   padding: EdgeInsets.all(sw * 0.04),
                   decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(isTablet ? sw * 0.025 : sw * 0.04)),
+                      borderRadius: BorderRadius.circular(
+                          isTablet ? sw * 0.025 : sw * 0.04)),
                   child: Column(
                     children: [
                       Container(
@@ -362,8 +537,8 @@ class _SubjectDetailScreenCompleteState
                             horizontal: sw * 0.02, vertical: sh * 0.015),
                         margin: EdgeInsets.only(bottom: sh * 0.02),
                         decoration: BoxDecoration(
-                            borderRadius:
-                                BorderRadius.circular(isTablet ? sw * 0.02 : sw * 0.03),
+                            borderRadius: BorderRadius.circular(
+                                isTablet ? sw * 0.02 : sw * 0.03),
                             border: Border.all(
                                 color: AppColors.primary.withOpacity(0.2),
                                 width: sw * 0.0025)),
@@ -376,7 +551,8 @@ class _SubjectDetailScreenCompleteState
                               SizedBox(width: sw * 0.02),
                               Text(_getCalendarHeaderTitle(),
                                   style: TextStyle(
-                                      fontSize: isTablet ? sw * 0.025 : sw * 0.045,
+                                      fontSize:
+                                          isTablet ? sw * 0.025 : sw * 0.045,
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.primary)),
                             ]),
@@ -390,7 +566,8 @@ class _SubjectDetailScreenCompleteState
                   padding: EdgeInsets.all(sw * 0.04),
                   decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(isTablet ? sw * 0.025 : sw * 0.04)),
+                      borderRadius: BorderRadius.circular(
+                          isTablet ? sw * 0.025 : sw * 0.04)),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -416,7 +593,8 @@ class _SubjectDetailScreenCompleteState
                   children: [
                     Row(children: [
                       Icon(Icons.history,
-                          color: AppColors.primary, size: isTablet ? sw * 0.035 : sw * 0.06),
+                          color: AppColors.primary,
+                          size: isTablet ? sw * 0.035 : sw * 0.06),
                       SizedBox(width: sw * 0.02),
                       Text('Attendance History',
                           style: TextStyle(
@@ -444,7 +622,8 @@ class _SubjectDetailScreenCompleteState
                             SizedBox(height: sh * 0.03),
                             Text('No attendance history yet',
                                 style: TextStyle(
-                                    fontSize: isTablet ? sw * 0.028 : sw * 0.045,
+                                    fontSize:
+                                        isTablet ? sw * 0.028 : sw * 0.045,
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.textSecondary))
                           ]))
@@ -461,6 +640,72 @@ class _SubjectDetailScreenCompleteState
                       ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add this method to your home screen class
+  Widget _buildNoteCard(Subject subject, double sw, double sh, bool isTablet) {
+    // Only show if subject has a note/description
+    if (subject.description == null || subject.description!.trim().isEmpty) {
+      return SizedBox.shrink();
+    }
+
+    return Container(
+      margin: EdgeInsets.only(top: sh * 0.015),
+      padding: EdgeInsets.all(isTablet ? sw * 0.03 : sw * 0.04),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(isTablet ? sw * 0.02 : sw * 0.03),
+        border: Border.all(
+          color: AppColors.warning.withOpacity(0.3),
+          width: sw * 0.002,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(isTablet ? sw * 0.015 : sw * 0.02),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.2),
+              borderRadius:
+                  BorderRadius.circular(isTablet ? sw * 0.01 : sw * 0.015),
+            ),
+            child: Icon(
+              Icons.sticky_note_2,
+              color: AppColors.warning,
+              size: isTablet ? sw * 0.025 : sw * 0.035,
+            ),
+          ),
+          SizedBox(width: sw * 0.025),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Note',
+                  style: AppTextStyles.medium(
+                    context,
+                    isTablet ? sw * 0.028 : sw * 0.045,
+                    AppColors.warning,
+                  ),
+                ),
+                SizedBox(height: sh * 0.005),
+                Text(
+                  subject.description!,
+                  style: AppTextStyles.regular(
+                    context,
+                    isTablet ? sw * 0.025 : sw * 0.032,
+                    AppColors.textSecondary,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),

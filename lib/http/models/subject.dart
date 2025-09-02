@@ -25,7 +25,7 @@ class Subject {
 
   bool get isGoalAchieved => percentage >= targetPercentage;
 
-  /// Calculates how many future lectures can be missed while staying above the target.
+
   int get lecturesCanMiss {
     if (percentage < targetPercentage) return 0;
 
@@ -135,16 +135,20 @@ class Subject {
       };
 
   factory Subject.fromJson(Map<String, dynamic> json) => Subject(
-        name: json['name'],
+        name: json['name'] ?? "Unknown", // fallback if null
         attendedLectures: json['attendedLectures'] ?? 0,
         totalLectures: json['totalLectures'] ?? 0,
         attendanceHistory: (json['attendanceHistory'] as List?)
-                ?.map((record) => AttendanceRecord.fromJson(record))
+                ?.map((record) =>
+                    AttendanceRecord.fromJson(record as Map<String, dynamic>))
                 .toList() ??
             [],
-        createdDate: DateTime.parse(json['createdDate']),
-        description: json['description'],
-        targetPercentage: json['targetPercentage']?.toInt() ?? 75,
+        createdDate: json['createdAt'] != null
+            ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
+            : DateTime.now(),
+        description: json['description'] ?? "",
+        targetPercentage:
+            (json['targetPercentage'] is int) ? json['targetPercentage'] : 75,
       );
 }
 
@@ -177,12 +181,15 @@ class AttendanceRecord {
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) =>
       AttendanceRecord(
-        date: DateTime.parse(json['date']),
-        markedAt: DateTime.parse(json['markedAt']),
-        isPresent: json['isPresent'] ??
-            true, //* Default to true for backward compatibility
-        lectureNumber: json['lectureNumber'],
-        notes: json['notes'],
-        subjectName: json['subjectName'] as String?,
+        date: json['date'] != null
+            ? DateTime.tryParse(json['date']) ?? DateTime.now()
+            : DateTime.now(),
+        markedAt: json['markedAt'] != null
+            ? DateTime.tryParse(json['markedAt']) ?? DateTime.now()
+            : DateTime.now(),
+        isPresent: json['isPresent'] ?? true,
+        lectureNumber: json['lectureNumber'] ?? 0,
+        notes: json['notes'] ?? "",
+        subjectName: json['subjectName'] ?? "Unknown",
       );
 }

@@ -133,6 +133,47 @@ class __AttendanceDialogState extends State<_AttendanceDialog>
   }
 
   void _markAttendance(bool isPresent) {
+    // Check if adding lectures would exceed 200
+    if (widget.subject.totalLectures + selectedLectureCount > 200) {
+      // Show error snackbar
+      double sw = ResponsiveHelper.getWidth(context);
+      bool isTablet = ResponsiveHelper.isTablet(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.warning,
+                color: Colors.white,
+                size: isTablet ? sw * 0.03 : sw * 0.05,
+              ),
+              SizedBox(width: sw * 0.02),
+              Expanded(
+                child: Text(
+                  'Cannot exceed 200 total lectures. Current: ${widget.subject.totalLectures}, Trying to add: $selectedLectureCount',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: isTablet ? sw * 0.02 : sw * 0.035,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.accent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(isTablet ? sw * 0.02 : sw * 0.03),
+          ),
+          duration: Duration(milliseconds: 3000),
+        ),
+      );
+
+      Navigator.of(context).pop();
+      return; // Exit the method without marking attendance
+    }
+
     // Haptic feedback
     HapticFeedback.lightImpact();
 
@@ -151,13 +192,16 @@ class __AttendanceDialogState extends State<_AttendanceDialog>
     // Add to attendance history
     DateTime now = DateTime.now();
     for (int i = 0; i < selectedLectureCount; i++) {
-      updatedSubject.attendanceHistory.add(AttendanceRecord(
-        subjectName: widget.subject.name,
-        date: now,
-        markedAt: now,
-        isPresent: isPresent,
-        lectureNumber: widget.subject.totalLectures + i + 1,
-      ));
+      updatedSubject.attendanceHistory.insert(
+        0, // ✅ latest goes to the start of the list
+        AttendanceRecord(
+          subjectName: widget.subject.name,
+          date: now,
+          markedAt: now,
+          isPresent: isPresent,
+          lectureNumber: widget.subject.totalLectures + i + 1,
+        ),
+      );
     }
 
     // Close dialog

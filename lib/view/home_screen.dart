@@ -21,6 +21,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   UserData? userData;
   bool isLoading = true;
+  bool isRefreshing = false;
+  DateTime? lastRefreshTime;
   late AnimationController _listAnimationController;
   late AnimationController _fabAnimationController;
   late Animation<double> _fabScaleAnimation;
@@ -64,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         isLoading = false;
       });
       _listAnimationController.forward();
-      Future.delayed(Duration(milliseconds: 500), () {
+      Future.delayed(Duration(milliseconds: 3000), () {
         _fabAnimationController.forward();
       });
     } else {
@@ -81,6 +83,116 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (userData != null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_data', jsonEncode(userData!.toJson()));
+    }
+  }
+
+  _refreshData() async {
+    // Check if refresh was done recently (within 5 seconds)
+    if (lastRefreshTime != null &&
+        DateTime.now().difference(lastRefreshTime!).inSeconds < 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please wait before refreshing again'),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isRefreshing = true;
+    });
+
+    // Show refreshing toast
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('Refreshing data...'),
+          ],
+        ),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      // Simulate refresh delay and reload data from storage
+      await Future.delayed(Duration(milliseconds: 1500));
+
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? userDataString = prefs.getString('user_data');
+
+      if (userDataString != null) {
+        setState(() {
+          userData = UserData.fromJson(jsonDecode(userDataString));
+        });
+
+        // Reset and replay list animation
+        _listAnimationController.reset();
+        _listAnimationController.forward();
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Text('Data refreshed successfully'),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text('Failed to refresh data'),
+            ],
+          ),
+          backgroundColor: AppColors.accent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } finally {
+      setState(() {
+        isRefreshing = false;
+      });
+      lastRefreshTime = DateTime.now();
     }
   }
 
@@ -263,14 +375,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 BorderRadius.circular(isTablet ? sw * 0.03 : sw * 0.025),
           ),
           child: IconButton(
-            icon: Icon(
-              Icons.analytics,
-              color: Colors.white,
-              size: isTablet ? sw * 0.04 : sw * 0.055,
-            ),
-            onPressed: () {
-              // Analytics functionality can be added here
-            },
+            icon: isRefreshing
+                ? SizedBox(
+                    width: isTablet ? sw * 0.04 : sw * 0.055,
+                    height: isTablet ? sw * 0.04 : sw * 0.055,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Icon(
+                    Icons.refresh,
+                    color: Colors.white,
+                    size: isTablet ? sw * 0.04 : sw * 0.055,
+                  ),
+            onPressed: isRefreshing ? null : _refreshData,
           ),
         ),
       ],
@@ -538,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                           SizedBox(width: sw * 0.01),
                           Text(
-                            'Last: ${DateFormat('MMM dd, HH:mm').format(subject.attendanceHistory.last.markedAt)}',
+                            'Last: ${DateFormat('MMM dd, HH:mm').format(subject.attendanceHistory.first.markedAt)}',
                             style: AppTextStyles.regular(
                               context,
                               isTablet ? sw * 0.035 : sw * 0.03,

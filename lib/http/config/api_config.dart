@@ -4,7 +4,7 @@ class ApiConfig {
 
   static const String _baseUrlDev = 'https://dev-api.example.com';
   static const String _baseUrlStaging = 'https://staging-api.example.com';
-  static const String _baseUrlProd = 'http://${IP}:2000';
+  static const String _baseUrlProd = 'https://attendance-track-prisma.onrender.com';
 
   static const String baseUrl2 = 'https://srv882174.hstgr.cloud';
 

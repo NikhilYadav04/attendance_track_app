@@ -65,6 +65,29 @@ class _EditSubjectDialogState extends State<EditSubjectDialog>
       int newAttended = int.parse(_attendedController.text);
       int newTotal = int.parse(_totalController.text);
 
+      if (newTotal > 200 || newAttended > 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('Lectures count cannot exceed 200'),
+              ],
+            ),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+
+        Navigator.pop(context);
+
+        return;
+      }
+
       // Create updated subject
       Subject updatedSubject = Subject(
         name: _nameController.text.trim(),
